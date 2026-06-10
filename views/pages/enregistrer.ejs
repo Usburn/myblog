@@ -1,0 +1,63 @@
+<%- include("partials/header") %>
+
+
+
+    <main class="Myform">
+
+        <form action="/enregistrer" method="POST">
+
+            <div>
+                <% if (locals.message) {%>
+                    <p>
+                        <%= message %>
+                    </p>
+                    <% } %>
+            </div>
+
+            <div class="form-input">
+                <label for="nom">Nom:</label>
+                <input type="text" name="nom" required>
+
+            </div>
+
+            <div class="form-input">
+                <label for="prenom">Prenom:</label>
+                <input type="text" name="prenom" required>
+
+            </div>
+
+
+            <div class="form-input">
+                <label for="email">Email:</label>
+                <input type="email" name="email" required>
+
+
+            </div>
+
+
+            <div class="form-input">
+
+                <label for="password">Password: </label>
+                <input type="password" name="password" required>
+
+
+            </div>
+
+            <div class="form-input">
+                <label for="confirm_password">Confirmer Password:</label>
+                <input type="password" name="confirm_password" required>
+
+            </div>
+
+
+            <button type="submit" class="btn">Enregister</button>
+
+
+        </form>
+
+
+    </main>
+
+
+
+    <%- include("partials/footer") %>

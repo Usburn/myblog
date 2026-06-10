@@ -1,0 +1,35 @@
+<%- include("partials/header") %>
+
+<main class="posts">
+    <% if (posts && posts.length > 0) { %>
+
+        <h1>Liste des posts</h1>
+
+        <% posts.forEach(post => { %>
+            <div class="post">
+                <h1><%= post.titre %></h1>
+
+                <h2> <%= post.accroche %></h2>
+
+                <p><%= new Date(post.date_post).toLocaleDateString('fr-FR') %></p>
+
+                <div class="post-btn">
+                    <a class="btn" href="/posts/<%= post.id_post %>">
+                        Voir les détails
+                    </a>
+
+                   <form action="/delete_post/<%= post.id_post %>" method="POST" class="btn">
+                    <button type="submit" class="btn btn-delete" onclick="return confirm('Etes vous sur de vouloir supprimer ce post')">Supprimer</button>
+                   </form>
+
+                </div>
+            </div>
+        <% }) %>
+
+    <% } else {%>
+        <h1>Il n'y pas encore de posts </h1>
+    
+    <%  }%>
+</main>
+
+<%- include("partials/footer") %>

@@ -1,0 +1,119 @@
+<%- include("partials/header.ejs") %>
+
+    <main class="Myform2">
+
+        <!-- FORMULAIRE POST -->
+        <form action="/Nouveau_post" method="POST" class="form-input">
+
+            <h1>Entrer un post</h1>
+
+            <div class="form-input">
+                <label for="titre">Titre :</label>
+                <input type="text" name="titre" required>
+            </div>
+
+            <div class="form-input">
+                <label for="accroche">Accroche:</label>
+                <input type="text" name="accroche">
+            </div>
+
+
+
+            <div class="form-input">
+                <label for="date">Date :</label>
+                <input type="date" name="date">
+            </div>
+
+            <button type="submit" class="btn">Enregistrer</button>
+
+        </form>
+
+
+
+        <!-- FORMULAIRE COMMENTAIRES -->
+
+        <form action="/nouveau_comment" method="post">
+            <h1>Entrer un paragraph</h1>
+
+            <% if(locals.posts){%>
+                
+                <div class="form-input">
+                    <label for="post_choisi">Choisir le post</label>
+
+                    <select name="post_choisi" id="post_choisi" required>
+                        <% posts.forEach(post=> { %>
+                            <option value="<%= post.id_post %>">
+                                <%= post.titre %>
+                            </option>
+                            <% }) %>
+                    </select>
+
+                </div>
+
+                   <% } %>
+
+                <div class="form-input">
+                    <label for="paragraph">Paragraph</label>
+                    <textarea name="paragraph" id="paragraph"></textarea>
+                </div>
+
+                <div>
+                    <label for="date">Date</label>
+                    <input type="datetime-local" name="date" id="date">
+                </div>
+                <button class="btn" type="submit">Enregistrer</button>
+
+
+             
+
+
+
+        </form>
+
+
+
+        <!-- FORMULAIRE Pour ajouter un fichier-->
+
+        <form action="/nouveau_file" method="post" enctype="multipart/form-data">
+            <h1>Entrer un fichier</h1>
+
+        <% if(locals.posts){ %>
+
+              <div class="form-input">
+                    <label for="post_choisi">Choisir le post</label>
+
+                    <select name="post_choisi" id="post_choisi" required>
+                        <% posts.forEach(post=> { %>
+                            <option value="<%= post.id_post %>">
+                                <%= post.titre %>
+                            </option>
+                            <% }) %>
+                    </select>
+
+                </div>
+
+      <%   } %>
+
+            <div>
+                <label for="file">Fichier</label>
+                <input type="file" name="file">
+
+            </div>
+            <label for="date">Date</label>
+            <input type="datetime-local" name="date" id="date">
+
+            <div>
+
+            </div>
+
+
+            <button type="submit" class="btn">Enregistrer</button>
+        </form>
+
+
+
+    </main>
+
+  
+
+    <%- include("partials/footer") %>

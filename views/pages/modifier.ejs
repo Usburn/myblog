@@ -1,0 +1,40 @@
+<!-- <%- include("partials/header") %>
+
+
+<main>
+
+<% if(locals.result) {%>
+  <h2>Modifier le paragraph en question</h2>
+  <form action="/update/<%= result.ID_POST %>" method="post">
+
+  <textarea name="content" rows="10" cols="50">
+    <%= result.CONTENU_P %>
+  </textarea>
+
+  <input type="hidden" name="id_paragraph" value="<%=result.ID_PARAGRAPH %>">
+
+  <button type="submit">Sauvegarder</button>
+
+</form>
+
+<% }else if(locals.result_file){%>
+  <form action="/update/<%= result_file.ID_POST %>" method="post" enctype="multipart/form-data">
+
+
+  <input type="hidden" name="id_file" value="<%=result_file.ID_FILE %>">
+  <input type="file" name="content_file">
+
+  <button type="submit">Sauvegarder</button>
+
+</form>
+
+
+<% }%>
+
+
+
+
+</main>
+
+
+<%- include("partials/footer") %> -->

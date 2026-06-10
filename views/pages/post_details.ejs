@@ -1,0 +1,73 @@
+<%- include("partials/header") %>
+
+<main class="post_details">
+  <div class="container_details">
+
+   <% if(MonTitre){%>
+
+    <h1><%= MonTitre%></h1>
+
+    <% } %>
+
+    <% if (contenu && contenu.length > 0) { %>
+
+      <% contenu.forEach(item => { %>
+
+        <% if (item.type === "paragraph") { %>
+          <div class="paragraph">
+               <p><%= item.content %></p>
+
+          </div>
+
+          <div class="form_paragraph hidden">
+              <form action="/update/<%= item.id%>" method="post">
+            <textarea name="new_paragraph" id="new_paragraph"> <%= item.content %> </textarea>
+            <button type="submit" class="btn">Enregistrer</button>
+          </form>
+
+          </div>
+       
+
+        
+        <% } %>
+
+        <% if (item.type === "file") { %>
+          <div class="details_image">
+            <img src="/uploads/<%= item.content %>" alt="">
+          </div>
+
+          <div class="form_file hidden">
+            <form action="/update/<%= item.id %>" enctype="multipart/form-data" method="post">
+              <input type="file" name = "new_file">
+              <button type="submit" class="btn">Enregistrer</button>
+            </form>
+
+          </div>
+
+
+        <% } %>
+
+      <% }) %>
+
+    <% } else { %>
+
+      <h1>Il n'y a pas encore de posts</h1>
+
+    <% } %>
+
+<hr>
+
+<% if(locals.show) {%>
+
+   <button type="submit" id="modif" class="special">Modifier ce post</button>
+
+      <button type="button" class="special hidden annulation" id="annulation">Annuler modification</button>
+
+<% }%>
+   
+
+  </div>
+</main>
+
+
+<%- include("partials/footer") %>

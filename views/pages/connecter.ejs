@@ -1,0 +1,40 @@
+<%- include("partials/header") %>
+
+     <main class="Myform">
+
+          <form action="/connecter" method="POST">
+
+               <div class="message">
+                    <% if(locals.message){ %>
+
+                         <p>
+                              <%=message %>
+                         </p>
+
+                         <% } %>
+
+
+               </div>
+
+               <div class="form-input">
+
+                    <label for="email">Email:</label>
+                    <input type="email" name="email" required />
+
+               </div>
+
+               <div class="form-input">
+                    <label for="password">Password:</label>
+                    <input type="password" name="password" required/>
+
+               </div>
+
+               <button type="submit" class="btn">Connecter</button>
+          </form>
+
+
+     </main>
+
+
+
+     <%- include("partials/footer") %>
