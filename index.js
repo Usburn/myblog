@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import bcrypt from "bcrypt";
 import session from "express-session";
 import upload from "./upload.js";
@@ -41,9 +42,30 @@ const db = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-db.connect()
-  .then(() => console.log("PostgreSQL connected"))
-  .catch((err) => console.error("DB error:", err));
+async function startServer() {
+  try {
+    await db.connect();
+    console.log("PostgreSQL connected");
+  } catch (err) {
+    console.error("DB connection error:", err);
+    process.exit(1);
+  }
+
+  // Initialize database schema
+  try {
+    const sql = fs.readFileSync(path.join(__dirname, "database.sql"), "utf8");
+    await db.query(sql);
+    console.log("Database schema initialized");
+  } catch (err) {
+    console.error("Error initializing database:", err);
+  }
+
+  app.listen(port, () => {
+    console.log(`Le serveur marche sur ${port}`);
+  });
+}
+
+startServer();
 
 
 
@@ -395,6 +417,4 @@ app.get("/CV/en", (req, res) => {
   res.render("CV/cv_en");
 });
 
-app.listen(port, () => {
-  console.log(`Le serveur marche sur ${port}`);
-});
+
