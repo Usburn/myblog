@@ -1,73 +1,202 @@
 <%- include("partials/header") %>
 
-<main class="post_details">
-  <div class="container_details">
+  <main class="post_details">
+    <div class="container_details">
 
-   <% if(MonTitre){%>
+      <% if(MonTitre){%>
 
-    <h1><%= MonTitre%></h1>
-
-    <% } %>
-
-    <% if (contenu && contenu.length > 0) { %>
-
-      <% contenu.forEach(item => { %>
-
-        <% if (item.type === "paragraph") { %>
-          <div class="paragraph">
-               <p><%= item.content %></p>
-
-          </div>
-
-          <div class="form_paragraph hidden">
-              <form action="/update/<%= item.id%>" method="post">
-            <textarea name="new_paragraph" id="new_paragraph"> <%= item.content %> </textarea>
-            <button type="submit" class="btn">Enregistrer</button>
-          </form>
-
-          </div>
-       
-
-        
-        <% } %>
-
-        <% if (item.type === "file") { %>
-          <div class="details_image">
-            <img src="/uploads/<%= item.content %>" alt="">
-          </div>
-
-          <div class="form_file hidden">
-            <form action="/update/<%= item.id %>" enctype="multipart/form-data" method="post">
-              <input type="file" name = "new_file">
-              <button type="submit" class="btn">Enregistrer</button>
-            </form>
-
-          </div>
-
+        <h1>
+          <%= MonTitre%>
+        </h1>
 
         <% } %>
 
-      <% }) %>
+          <% if (contenu && contenu.length> 0) { %>
 
-    <% } else { %>
+            <% contenu.forEach(item=> { %>
 
-      <h1>Il n'y a pas encore de posts</h1>
+              <% if (item.type==="paragraph" ) { %>
+                <div class="paragraph">
+                  <p>
+                    <%= item.content %>
+                  </p>
 
-    <% } %>
+                </div>
 
-<hr>
+                <div class="form_paragraph hidden">
+                  <form action="/update/<%= item.id%>" method="post">
+                    <textarea name="new_paragraph" id="new_paragraph"> <%= item.content %> </textarea>
+                    <button type="submit" class="btn">Enregistrer</button>
+                  </form>
 
-<% if(locals.show) {%>
+                </div>
 
-   <button type="submit" id="modif" class="special">Modifier ce post</button>
+                <% } %>
 
-      <button type="button" class="special hidden annulation" id="annulation">Annuler modification</button>
+                  <% if (item.type==="file" ) { %>
+                    <div class="details_image">
+                      <img src="/uploads/<%= item.content %>" alt="">
+                    </div>
 
-<% }%>
-   
+                    <div class="form_file hidden">
+                      <form action="/update/<%= item.id %>" enctype="multipart/form-data" method="post">
+                        <input type="file" name="new_file">
+                        <button type="submit" class="btn">Enregistrer</button>
+                      </form>
 
-  </div>
-</main>
+                    </div>
 
 
-<%- include("partials/footer") %>
+                    <% } %>
+
+                      <% }) %>
+
+                        <% } else { %>
+
+                          <h1>Il n'y a pas encore de posts</h1>
+
+                          <% } %>
+
+                            <hr>
+
+                            <div class="container_btn2">
+                              <form action="/resume/<%= id_selected %>" method="post">
+                                <button type="submit" class="btn">AI Resume</button>
+                              </form>
+
+
+                              <button type="button" class="btn" id="regarderTousCommentaires">Regarder les
+                                commentaires</button>
+
+
+                              <button type="button" class="btn" id="btn-commentaire">Ajouter un commentaire</button>
+
+                            </div>
+
+                            <div class="below-post">
+
+
+
+                              <div class="all-commentaires hidden">
+
+                                <% if(locals.commentaires){%>
+
+                                  <% commentaires.forEach(commentaire=> { %>
+
+                                    <div class="user-commentaire">
+                                      <p>
+                                        <%= commentaire.contenu%>
+                                      </p>
+                                      <p>
+                                        <%= commentaire.nom%>
+                                          <%= commentaire.prenom%> , le <%= new
+                                              Date(commentaire.date_creation).toLocaleString() %>
+                                      </p>
+
+
+                                      <button type="button" class="btnreponse">répondre</button>
+
+                                      <form class="reponse_commentaire hidden"
+                                        action="/reponse_commentaire/<%= commentaire.id_commentaire %>" method="post">
+
+
+                                        <div>
+                                          <label for="nom">Nom:</label>
+                                          <input type="text" name="nom">
+
+                                        </div>
+
+
+                                        <div>
+                                          <label for="prenom">Prenom:</label>
+                                          <input type="text" name="prenom">
+
+                                        </div>
+
+
+
+
+
+
+                                        <div>
+
+                                          <label for="reponse_commentaire_<%= commentaire.id_commentaire %>">Ajouter un
+                                            commentaire:</label>
+                                          <textarea name="reponse_commentaire"
+                                            id="reponse_commentaire_<%= commentaire.id_commentaire %>"></textarea>
+                                          <button type="submit">Enregistrer</button>
+
+                                        </div>
+
+
+                                      </form>
+
+                                    </div>
+
+                                    <% }) %>
+
+                                      <% } %>
+
+                              </div>
+
+
+
+
+                              <div class="commentaires form-input hidden" id="form-commentaire">
+                                <form action="/commentaires/<%= id_selected %>" method="post">
+                                  <div> <label for="nom">Nom:</label>
+                                    <input type="text" name="nom" required>
+                                  </div>
+                                  <div>
+                                    <label for="prenom">Prenom:</label>
+                                    <input type="text" name="prenom" required>
+                                  </div>
+
+                                  <div>
+                                    <label for="commentaire">Commentaires:</label>
+                                    <textarea name="commentaire" id="commentaire" required></textarea>
+
+                                  </div>
+
+
+                                  <button type="submit" class="btn">Enregistrer</button>
+                                </form>
+
+                              </div>
+
+
+                              <div>
+                                <% if (locals.titreIA) { %>
+                                  <div class="ai_resume">
+                                    <h3>Résumé IA</h3>
+                                    <p>
+                                      <%= titreIA %>
+                                    </p>
+                                  </div>
+                                  <% } %>
+
+                              </div>
+
+
+                            </div>
+
+
+
+                            <% if(locals.show) {%>
+
+                              <button type="submit" id="modif" class="special">Modifier ce post</button>
+
+                              <button type="button" class="special hidden annulation" id="annulation">Annuler
+                                modification</button>
+
+                              <% }%>
+
+
+
+
+
+    </div>
+  </main>
+
+
+  <%- include("partials/footer") %>

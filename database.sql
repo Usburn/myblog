@@ -40,4 +40,14 @@ create table if not exists file (
 );
 
 
+create table if not exists commentaires (
+id_commentaire serial primary key, 
+contenu text not null, 
+id_post integer,
+foreign key(id_post) references post(id_post) on delete cascade
+
+);
+
+
+
 

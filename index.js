@@ -32,7 +32,7 @@ app.use(
     },
   })
 );
-console.log("SECRET:", process.env.SECRET);
+
 
 
 const { Pool } = pg;
@@ -286,6 +286,9 @@ app.get("/posts/:id", verifAuth, async (req, res) => {
       [id_post]
     );
 
+    const result_commentaire = await db.query(`SELECT * FROM commentaires where id_post= $1`,[id_post]);
+    const result2 = result_commentaire.rows;
+
     const paragraphes = paragraphesRes.rows;
     const files = filesRes.rows;
     const row = postRes.rows[0];
@@ -315,6 +318,7 @@ app.get("/posts/:id", verifAuth, async (req, res) => {
       id_selected: id_post,
       MonTitre: row.titre,
       contenu,
+      commentaires:result2,
       show
     });
 
@@ -391,6 +395,166 @@ app.post("/delete_post/:id", verifAuthAdmin, async (req, res) => {
     return res.status(404).send("Erreur de suppression");
   }
 });
+
+app.get("/resume/:id", (req, res)=>{
+  const id = parseInt(req.params.id)
+
+  res.redirect(`/posts/${id}`)
+});
+
+app.post('/resume/:id', async (req, res) => {
+    const id = parseInt(req.params.id);
+
+    try {
+        // Récupérer les paragraphes
+        const { rows } = await db.query(
+            `SELECT * FROM PARAGRAPH WHERE ID_POST = $1`,
+            [id]
+        );
+
+        const texteComplet = rows.map(row => row.contenu_p).join('\n\n');
+
+        // Appel IA
+        let titreIA = "Erreur : L'IA ne répond pas";
+        try {
+            const response = await fetch('http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: "qwen3.5:2b",
+                    prompt: `Analyze the following text. Reply ONLY in this exact format, no polite phrases:
+Catégorie : [text type: example biology, economy, etc] | Titre : [your title maximum 10 words] | Resume: [200 words max, 80 words min]
+IMPORTANT: Write the Catégorie, Titre and Resume in the SAME language as the text below.
+Text to analyze: ${texteComplet}`,
+                    stream: false,
+                    think:false
+                })
+            });
+            const data = await response.json();
+            titreIA = data.response;
+        } catch (error) {
+            console.error("Erreur IA :", error);
+        }
+
+        // Récupérer les fichiers et le post en parallèle
+        const [filesResult, postResult, commentairesResult] = await Promise.all([
+            db.query(`SELECT * FROM FILE WHERE ID_POST = $1`, [id]),
+            db.query(`SELECT * FROM POST WHERE ID_POST = $1`, [id]),
+            db.query(`SELECT * FROM commentaires  WHERE ID_POST = $1`, [id])
+        ]);
+
+        const files = filesResult.rows;
+        const post  = postResult.rows[0];
+        const commentaires = commentairesResult.rows;
+
+        if (!post) return res.status(404).send("Post introuvable");
+
+        const show = req.session.user && req.session.user.is_admin === 1 ? "show" : null;
+
+        const contenu = [
+            ...rows.map(p => ({ type: "paragraph", id: p.id_paragraph, date: p.date_creation_p, content: p.contenu_p })),
+            ...files.map(f => ({ type: "file",      id: f.id_file,      date: f.date_creation_f, content: f.contenu_f })),
+        ];
+        contenu.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        res.render("pages/post_details", {
+            id_selected: id,
+            MonTitre: post.titre,
+            contenu,
+            commentaires,
+            show,
+            titreIA
+        });
+
+    } catch (err) {
+        console.error("Erreur DB :", err);
+        res.status(500).send("Erreur serveur");
+    }
+});
+
+
+
+
+app.post("/commentaires/:id_selected", async (req, res) => {
+  const id = parseInt(req.params.id_selected);
+  if (isNaN(id)) return res.status(400).send("ID invalide");
+
+  const { nom, prenom, commentaire } = req.body;
+
+  try {
+    const responseIA = await fetch('http://localhost:11434/api/chat', {
+      method: 'POST',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "llama3.1:latest",
+        stream: false,
+        temperature: 0,         // ← déterministe, pas de créativité
+        messages: [
+          {
+            role: "system",
+            content: `Tu es un modérateur strict. 
+Tu analyses des commentaires pour détecter : insultes, harcèlement, spam, mots de passe ou clés d'API.
+Tu réponds UNIQUEMENT par un seul mot en majuscules : REJET ou APPROUVÉ.
+Aucune explication. Aucune phrase. Un seul mot.`
+          },
+          {
+            role: "user",
+            content: commentaire
+          }
+        ]
+      })
+    });
+
+    const data = await responseIA.json();
+
+    if (!responseIA.ok || data.error) {
+      console.error("Ollama error:", data.error ?? responseIA.status);
+      throw new Error("Modération IA indisponible");
+    }
+
+    const rawText = data.message?.content ?? "";
+    console.log("Réponse brute Ollama:", JSON.stringify(rawText));
+
+    // Nettoyer et extraire le dernier mot (sécurité supplémentaire)
+    const cleanedText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    const words = cleanedText.split(/\s+/).filter(Boolean);
+    const decision = (words[words.length - 1] ?? "").toUpperCase();
+
+    console.log("Décision extraite:", decision);
+
+    if (decision === "REJET") {
+      return res.status(400).send("Votre commentaire a été bloqué par le modérateur IA (contenu inapproprié ou données sensibles détectées).");
+    }
+
+    // Si le modèle ne répond pas APPROUVÉ non plus → bloquer par défaut
+    if (decision !== "APPROUVÉ" && decision !== "APPROUVE") {
+      console.warn("Réponse inattendue du modèle:", decision);
+      return res.status(400).send("Modération impossible : réponse inattendue du modèle IA.");
+    }
+
+    await db.query(
+      `INSERT INTO commentaires(nom, prenom, contenu, id_post) VALUES($1, $2, $3, $4)`,
+      [nom, prenom, commentaire, id]
+    );
+
+    res.redirect(`/posts/${id}`);
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send("Erreur dans l'insertion des commentaires");
+  }
+});
+
+
+app.post("/reponse_commentaire/:id_commentaire", (req, res)=>{
+  const id_commentaire = parseInt( req.params.id_commentaire);
+  console.log(id_commentaire)
+
+})
+
+
+
+
 
 app.get("/CV", (req, res) => {
   res.render("CV/cv");
