@@ -435,7 +435,7 @@ app.post('/resume/:id', async (req, res) => {
         // Appel IA
         let titreIA = "Erreur : L'IA ne répond pas";
         try {
-            const response = await fetch('http://localhost:11434/api/generate', {
+            const response = await fetch('http://${{ollama.RAILWAY_PRIVATE_DOMAIN}}:11434/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -500,11 +500,11 @@ app.post("/commentaires/:id_selected", async (req, res) => {
   const { nom, prenom, commentaire } = req.body;
 
   try {
-    const responseIA = await fetch('http://localhost:11434/api/chat', {
+    const responseIA = await fetch('http://${{ollama.RAILWAY_PRIVATE_DOMAIN}}:11434/api/chat', {
       method: 'POST',
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "llama3.1:latest",
+        model: "qwen3.5:2b",
         stream: false,
         temperature: 0,         // ← déterministe, pas de créativité
         messages: [
