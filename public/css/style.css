@@ -102,6 +102,31 @@ main.accueil {
 }
 
 
+.meteo{
+position: absolute;
+top: 0rem;
+    right: 1rem;
+    border: 1 px solid black;
+     box-shadow:0px 20px 20px 0px rgba(0, 0, 0, 0.8);         
+    backdrop-filter:contrast(0.8) saturate(100%) blur(10px); 
+     -webkit-backdrop-filter: contrast(0.8) saturate(100%) blur(20px);
+     
+     padding: 0.3rem 1rem;
+     border-radius: 8px;
+     
+}
+
+.meteo-container{
+    display: flex;
+    gap: 8px;
+
+}
+
+.meteo p {
+    margin: 0;
+}
+
+
  .introduction{
     padding: 1.5rem;
     line-height: 1.5rem;
@@ -114,7 +139,7 @@ main.accueil {
     overflow-y: auto;
     border-radius: 8px;
     box-shadow:0px 20px 20px 0px rgba(0, 0, 0, 0.8);         
-    backdrop-filter:contrast(0.5) saturate(100%) blur(20px); 
+    backdrop-filter:contrast(0.8) saturate(100%) blur(10px); 
      -webkit-backdrop-filter: contrast(0.5) saturate(100%) blur(20px);
 
 }
@@ -134,7 +159,7 @@ main.accueil {
     border-radius: 8px;
     height: auto;
     box-shadow:0px 20px 20px 0px rgba(0, 0, 0, 0.7);         
-    backdrop-filter:contrast(1) saturate(100%) blur(15px); 
+  backdrop-filter:contrast(0.9) saturate(100%) blur(10px); 
      -webkit-backdrop-filter: contrast(0.5) saturate(100%) blur(20px);
 }
 

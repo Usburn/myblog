@@ -5,6 +5,36 @@
 <main class="accueil">
      <h1>Bienvenu à mon blog </h1>
 
+
+<% if (locals.data) { %>
+
+  <div class="meteo">
+    <div class="meteo-container">
+
+      <p>Sherbrooke</p>
+
+      <p>
+        <i class="fa-solid fa-temperature-empty"></i> :
+        <%= data.temperature %> °C
+      </p>
+
+      <p>
+        <i class="fa-solid fa-cloud-showers-heavy"></i> :
+        <%= data.humidity %> %
+      </p>
+
+      <p>
+        <i class="fa-solid fa-hurricane"></i> :
+        <%= data.wind %> km/h
+      </p>
+
+    </div>
+  </div>
+
+<% } %>
+
+
+
      <div class="introduction" >
           <h3>Résumé</h3>
           <p>En tant qu’apprenant permanent, j’ai créé cet espace pour présenter les différents projets 

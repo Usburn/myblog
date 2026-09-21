@@ -90,7 +90,7 @@
                                       <p>
                                         <%= commentaire.nom%>
                                           <%= commentaire.prenom%> , le <%= new
-                                              Date(commentaire.date_creation).toLocaleString() %>
+                                              Date(commentaire.date_commentaire).toLocaleString() %>
                                       </p>
 
 
@@ -124,6 +124,8 @@
                                             commentaire:</label>
                                           <textarea name="reponse_commentaire"
                                             id="reponse_commentaire_<%= commentaire.id_commentaire %>"></textarea>
+
+                                            
                                           <button type="submit">Enregistrer</button>
 
                                         </div>
@@ -157,6 +159,10 @@
                                     <textarea name="commentaire" id="commentaire" required></textarea>
 
                                   </div>
+                                  <div>
+                                              <label for="date_commentaire">Date</label>
+                                              <input type="date" name="date_commentaire">
+                                            </div>
 
 
                                   <button type="submit" class="btn">Enregistrer</button>

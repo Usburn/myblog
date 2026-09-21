@@ -34,13 +34,38 @@ app.use(
   })
 );
 
-
-
 const { Pool } = pg;
 
-const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+let db;
+
+if (process.env.ISDEVELOPMENT === "true") {
+
+  db = new Pool({
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: Number(process.env.DB_PORT),
+  });
+
+} else {
+
+  db = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false,
+    },
+  });
+
+}
+
+db.connect()
+  .then(() => console.log("✅ PostgreSQL connected"))
+  .catch((err) => console.error("❌ DB error:", err));
+
+
+export default db;
+
 
 async function startServer() {
   try {
@@ -104,12 +129,62 @@ function verifAuthAdmin(req, res, next) {
   }
   next();
 }
+console.log("FICHIER SERVEUR CHARGÉ");
 
-app.get("/", (req, res) => {
-  res.render("pages/accueil.ejs");
+app.get("/", async (req, res) => {
+
+  console.log("ip :", req.ip);
+  const ip = req.ip;
+
+  let dataMeteo = null;
+
+  try {
+
+    const response = await fetch(
+      `https://api.ipwho.org/ip/70.82.41.209?apiKey=${process.env.API_KEY_IP}`
+    );
+
+    const dataIP = await response.json();
+
+    const ville = dataIP.data.geoLocation.city;
+    const lat = dataIP.data.geoLocation.latitude;
+    const lon = dataIP.data.geoLocation.longitude;
+
+    console.log(ville);
+
+    try {
+
+      const meteo = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,relative_humidity_2m`
+      );
+
+      const result_meteo = await meteo.json();
+
+      dataMeteo = {
+        ville: ville,
+        temperature: result_meteo.current.temperature_2m,
+        humidity: result_meteo.current.relative_humidity_2m,
+        wind: result_meteo.current.wind_speed_10m
+      };
+
+    } catch (err) {
+      console.log("Erreur météo :", err);
+    }
+
+  } catch (err) {
+    console.log("Erreur IP :", err);
+  }
+
+  res.render("pages/accueil.ejs", {
+    data: dataMeteo
+  });
+
 });
 
+
+
 app.get("/accueil", (req, res) => {
+   console.log(req);
   res.redirect("/");
 });
 
@@ -122,7 +197,10 @@ app.post("/enregistrer", async (req, res) => {
     const { nom, prenom, email, password, confirm_password } = req.body;
     console.log(nom);
     console.log(prenom);
-    console.log(email);
+    console.log(email);app.get("/", (req, res) => {
+  console.log("Jesus is good");
+  res.render("pages/accueil.ejs");
+});
     console.log(password);
     console.log(confirm_password)
 
@@ -424,57 +502,164 @@ app.post('/resume/:id', async (req, res) => {
     const id = parseInt(req.params.id);
 
     try {
-        // Récupérer les paragraphes
+        // 1. Récupérer les paragraphes du post
         const { rows } = await db.query(
             `SELECT * FROM PARAGRAPH WHERE ID_POST = $1`,
             [id]
         );
 
-        const texteComplet = rows.map(row => row.contenu_p).join('\n\n');
+        // Construire le texte complet à envoyer à Ollama
+        const texteComplet = rows
+            .map(row => row.contenu_p)
+            .join('\n\n');
 
-        // Appel IA
+        // Valeur par défaut en cas d'erreur IA
         let titreIA = "Erreur : L'IA ne répond pas";
+
+        // 2. Appel à Ollama
         try {
-            const response = await fetch(process.env.OLLAMA_URL + '/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: "qwen3.5:2b",
-                    prompt: `Analyze the following text. Reply ONLY in this exact format, no polite phrases:
-Catégorie : [text type: example biology, economy, etc] | Titre : [your title maximum 10 words] | Resume: [200 words max, 80 words min]
-IMPORTANT: Write the Catégorie, Titre and Resume in the SAME language as the text below.
-Text to analyze: ${texteComplet}`,
-                    stream: false,
-                    think:false
-                })
-            });
+            const response = await fetch(
+                `${process.env.OLLAMA_URL}/api/chat`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: process.env.OLLAMA_MODEL,
+
+                        messages: [
+                            {
+                                role: "system",
+                                content: `
+Tu es un assistant spécialisé dans l'analyse et le résumé de textes.
+
+Tu dois respecter exactement le format demandé par l'utilisateur.
+
+Ne donne aucune phrase d'introduction.
+Ne donne aucune explication supplémentaire.
+`
+                            },
+                            {
+                                role: "user",
+                                content: `
+Analyze the following text.
+
+Reply ONLY in this exact format:
+
+Catégorie : [text type: example biology, economy, technology, etc] | Titre : [your title maximum 10 words] | Resume : [200 words max, 80 words min]
+
+IMPORTANT:
+
+- Write the Catégorie, Titre and Resume in the SAME language as the text.
+- The title must contain maximum 10 words.
+- The resume must contain between 80 and 200 words.
+- Do not add polite phrases.
+- Do not add markdown.
+- Do not add anything before or after the requested format.
+
+Text to analyze:
+
+${texteComplet}
+`
+                            }
+                        ],
+
+                        stream: false,
+                        think: false
+                    })
+                }
+            );
+
+            // Vérifier si Ollama retourne une erreur HTTP
+            if (!response.ok) {
+                const errorText = await response.text();
+
+                throw new Error(
+                    `Erreur Ollama ${response.status}: ${errorText}`
+                );
+            }
+
             const data = await response.json();
-            titreIA = data.response;
+
+            // Avec /api/chat, la réponse est ici
+            if (data.message && data.message.content) {
+                titreIA = data.message.content.trim();
+            } else {
+                console.error("Réponse Ollama inattendue :", data);
+                titreIA = "Erreur : réponse IA invalide";
+            }
+
+            console.log("Réponse IA :", titreIA);
+
         } catch (error) {
             console.error("Erreur IA :", error);
+
+            titreIA = "Erreur : L'IA ne répond pas";
         }
 
-        // Récupérer les fichiers et le post en parallèle
-        const [filesResult, postResult, commentairesResult] = await Promise.all([
-            db.query(`SELECT * FROM FILE WHERE ID_POST = $1`, [id]),
-            db.query(`SELECT * FROM POST WHERE ID_POST = $1`, [id]),
-            db.query(`SELECT * FROM commentaires  WHERE ID_POST = $1`, [id])
+        // 3. Récupérer fichiers, post et commentaires en parallèle
+        const [
+            filesResult,
+            postResult,
+            commentairesResult
+        ] = await Promise.all([
+            db.query(
+                `SELECT * FROM FILE WHERE ID_POST = $1`,
+                [id]
+            ),
+
+            db.query(
+                `SELECT * FROM POST WHERE ID_POST = $1`,
+                [id]
+            ),
+
+            db.query(
+                `SELECT * FROM commentaires WHERE ID_POST = $1`,
+                [id]
+            )
         ]);
 
         const files = filesResult.rows;
-        const post  = postResult.rows[0];
+        const post = postResult.rows[0];
         const commentaires = commentairesResult.rows;
 
-        if (!post) return res.status(404).send("Post introuvable");
+        // Vérifier que le post existe
+        if (!post) {
+            return res.status(404).send("Post introuvable");
+        }
 
-        const show = req.session.user && req.session.user.is_admin === 1 ? "show" : null;
+        // 4. Vérifier si l'utilisateur est admin
+        const show =
+            req.session.user &&
+            req.session.user.is_admin === 1
+                ? "show"
+                : null;
 
+        // 5. Fusionner paragraphes et fichiers
         const contenu = [
-            ...rows.map(p => ({ type: "paragraph", id: p.id_paragraph, date: p.date_creation_p, content: p.contenu_p })),
-            ...files.map(f => ({ type: "file",      id: f.id_file,      date: f.date_creation_f, content: f.contenu_f })),
-        ];
-        contenu.sort((a, b) => new Date(a.date) - new Date(b.date));
+            ...rows.map(p => ({
+                type: "paragraph",
+                id: p.id_paragraph,
+                date: p.date_creation_p,
+                content: p.contenu_p
+            })),
 
+            ...files.map(f => ({
+                type: "file",
+                id: f.id_file,
+                date: f.date_creation_f,
+                content: f.contenu_f
+            }))
+        ];
+
+        // 6. Trier par date
+        contenu.sort(
+            (a, b) =>
+                new Date(a.date) - new Date(b.date)
+        );
+
+        // 7. Afficher la page
         res.render("pages/post_details", {
             id_selected: id,
             MonTitre: post.titre,
@@ -486,6 +671,7 @@ Text to analyze: ${texteComplet}`,
 
     } catch (err) {
         console.error("Erreur DB :", err);
+
         res.status(500).send("Erreur serveur");
     }
 });
@@ -495,71 +681,187 @@ Text to analyze: ${texteComplet}`,
 
 app.post("/commentaires/:id_selected", async (req, res) => {
   const id = parseInt(req.params.id_selected);
-  if (isNaN(id)) return res.status(400).send("ID invalide");
 
-  const { nom, prenom, commentaire } = req.body;
+  if (isNaN(id)) {
+    return res.status(400).send("ID invalide");
+  }
+
+  const { nom, prenom, commentaire , date_commentaire} = req.body;
+
+  if (!commentaire || !commentaire.trim()) {
+    return res.status(400).send("Le commentaire est vide.");
+  }
+
+  if (!process.env.OLLAMA_URL) {
+    console.error("OLLAMA_URL est undefined");
+    return res.status(500).send("Configuration Ollama manquante.");
+  }
 
   try {
-    const responseIA = await fetch(process.env.OLLAMA_URL + '/api/chat', {
-      method: 'POST',
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "qwen3.5:2b",
-        stream: false,
-        temperature: 0,         // ← déterministe, pas de créativité
-        messages: [
-          {
-            role: "system",
-            content: `Tu es un modérateur strict. 
-Tu analyses des commentaires pour détecter : insultes, harcèlement, spam, mots de passe ou clés d'API.
-Tu réponds UNIQUEMENT par un seul mot en majuscules : REJET ou APPROUVÉ.
-Aucune explication. Aucune phrase. Un seul mot.`
+    const responseIA = await fetch(
+      `${process.env.OLLAMA_URL}/api/chat`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+          model: process.env.OLLAMA_MODEL,
+
+          stream: false,
+
+          think: false,
+
+          options: {
+            temperature: 0
           },
-          {
-            role: "user",
-            content: commentaire
-          }
-        ]
-      })
-    });
 
-    const data = await responseIA.json();
+          messages: [
+            {
+              role: "system",
+              content: `
+Tu es un modérateur strict.
 
-    if (!responseIA.ok || data.error) {
-      console.error("Ollama error:", data.error ?? responseIA.status);
+Tu analyses le commentaire utilisateur afin de détecter :
+
+- insultes
+- harcèlement
+- menaces
+- spam
+- mots de passe
+- clés API
+- jetons d'accès
+- informations d'authentification sensibles
+
+Tu dois répondre UNIQUEMENT par :Ubuntu Mono
+
+APPROUVÉ
+
+ou
+
+REJET
+
+Aucune explication.
+Aucune phrase.
+Aucun Markdown.
+Un seul mot.
+`
+            },
+            {
+              role: "user",
+              content: commentaire.trim()
+            }
+          ]
+        })
+      }
+    );
+
+    const rawResponse = await responseIA.text();
+
+    if (!responseIA.ok) {
+      console.error(
+        "Erreur HTTP Ollama:",
+        responseIA.status,
+        rawResponse
+      );
+
+      throw new Error("Modération IA indisponible");
+    }
+
+    let data;
+
+    try {
+      data = JSON.parse(rawResponse);
+    } catch (error) {
+      console.error(
+        "Réponse Ollama non JSON:",
+        rawResponse
+      );
+
+      throw new Error("Réponse Ollama invalide");
+    }
+
+    if (data.error) {
+      console.error("Erreur Ollama:", data.error);
+
       throw new Error("Modération IA indisponible");
     }
 
     const rawText = data.message?.content ?? "";
-    console.log("Réponse brute Ollama:", JSON.stringify(rawText));
 
-    // Nettoyer et extraire le dernier mot (sécurité supplémentaire)
-    const cleanedText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-    const words = cleanedText.split(/\s+/).filter(Boolean);
-    const decision = (words[words.length - 1] ?? "").toUpperCase();
+    console.log(
+      "Réponse brute Ollama:",
+      JSON.stringify(rawText)
+    );
+
+    const cleanedText = rawText
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .trim();
+
+    const words = cleanedText
+      .split(/\s+/)
+      .filter(Boolean);
+
+    const decision = (
+      words[words.length - 1] ?? ""
+    ).toUpperCase();
 
     console.log("Décision extraite:", decision);
 
     if (decision === "REJET") {
-      return res.status(400).send("Votre commentaire a été bloqué par le modérateur IA (contenu inapproprié ou données sensibles détectées).");
+      return res
+        .status(400)
+        .send(
+          "Votre commentaire a été bloqué par le modérateur IA."
+        );
     }
 
-    // Si le modèle ne répond pas APPROUVÉ non plus → bloquer par défaut
-    if (decision !== "APPROUVÉ" && decision !== "APPROUVE") {
-      console.warn("Réponse inattendue du modèle:", decision);
-      return res.status(400).send("Modération impossible : réponse inattendue du modèle IA.");
+    if (
+      decision !== "APPROUVÉ" &&
+      decision !== "APPROUVE"
+    ) {
+      console.warn(
+        "Réponse inattendue du modèle:",
+        rawText
+      );
+
+      return res
+        .status(400)
+        .send(
+          "Modération impossible : réponse inattendue du modèle IA."
+        );
     }
 
     await db.query(
-      `INSERT INTO commentaires(nom, prenom, contenu, id_post) VALUES($1, $2, $3, $4)`,
-      [nom, prenom, commentaire, id]
+      `
+      INSERT INTO commentaires
+      (nom, prenom, contenu, date_commentaire, id_post)
+      VALUES ($1, $2, $3, $4, $5)
+      `,
+      [
+        nom?.trim(),
+        prenom?.trim(),
+        commentaire.trim(),
+        date_commentaire,
+        id
+      ]
     );
 
-    res.redirect(`/posts/${id}`);
+    return res.redirect(`/posts/${id}`);
 
   } catch (err) {
-    console.error(err);
-    return res.status(500).send("Erreur dans l'insertion des commentaires");
+    console.error(
+      "Erreur lors de la modération ou de l'insertion :",
+      err
+    );
+
+    return res
+      .status(500)
+      .send(
+        "Erreur dans la modération ou l'insertion du commentaire."
+      );
   }
 });
 
@@ -582,3 +884,6 @@ app.get("/CV/en", (req, res) => {
 });
 
 
+app.listen(port, ()=>{
+  console.log("Server is running on port 3000")
+})
