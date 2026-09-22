@@ -113,7 +113,7 @@ function verifAuth(req, res, next) {
   if (!req.session.user) {
     req.session.message =
       "Veuillez vous connecter afin d’accéder aux publications";
-      req.session.returnTo = req.originalUrl; // ← sauvegarde AVANT la redirection
+    req.session.returnTo = req.originalUrl; // ← sauvegarde AVANT la redirection
     return res.redirect("/connecter");
   }
   req.session.returnTo = req.originalUrl;
@@ -174,7 +174,7 @@ app.get("/", async (req, res) => {
 
 
 app.get("/accueil", (req, res) => {
-   console.log(req);
+  console.log(req);
   res.redirect("/");
 });
 
@@ -187,10 +187,10 @@ app.post("/enregistrer", async (req, res) => {
     const { nom, prenom, email, password, confirm_password } = req.body;
     console.log(nom);
     console.log(prenom);
-    console.log(email);app.get("/", (req, res) => {
-  console.log("Jesus is good");
-  res.render("pages/accueil.ejs");
-});
+    console.log(email); app.get("/", (req, res) => {
+      console.log("Jesus is good");
+      res.render("pages/accueil.ejs");
+    });
     console.log(password);
     console.log(confirm_password)
 
@@ -288,7 +288,7 @@ app.post("/Nouveau_post", async (req, res) => {
     const posts = await allPosts();
 
 
-    
+
 
     return res.render("pages/Nouveau_post", { posts });
 
@@ -372,7 +372,7 @@ app.get("/posts/:id", verifAuth, async (req, res) => {
       [id_post]
     );
 
-    const result_commentaire = await db.query(`SELECT * FROM commentaires where id_post= $1`,[id_post]);
+    const result_commentaire = await db.query(`SELECT * FROM commentaires where id_post= $1`, [id_post]);
     const result2 = result_commentaire.rows;
 
     const paragraphes = paragraphesRes.rows;
@@ -404,7 +404,7 @@ app.get("/posts/:id", verifAuth, async (req, res) => {
       id_selected: id_post,
       MonTitre: row.titre,
       contenu,
-      commentaires:result2,
+      commentaires: result2,
       show
     });
 
@@ -482,65 +482,119 @@ app.post("/delete_post/:id", verifAuthAdmin, async (req, res) => {
   }
 });
 
-app.get("/resume/:id", (req, res)=>{
+
+
+
+
+app.get("/resume/:id", (req, res) => {
   const id = parseInt(req.params.id)
 
   res.redirect(`/posts/${id}`)
 });
 
+
+async function Appeler_Ollama(systemPrompt, userPrompt, temperature = 0.7, maxTokens = 500) {
+    const isDev = process.env.ISDEVELOPMENT === "true";
+
+    const url = isDev
+        ? `${process.env.OLLAMA_URL}/api/chat`
+        : `${process.env.OLLAMA_URL}/v1/chat/completions`;
+
+    const body = {
+        model: process.env.OLLAMA_MODEL,
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+        ],
+        stream: false
+    };
+
+    if (isDev) {
+        body.options = { temperature };
+    } else {
+        body.temperature = temperature;
+        body.max_tokens = maxTokens;
+    }
+
+    try {
+        console.log(isDev ? "Mode développement" : "Mode production");
+        console.log("URL IA :", url);
+        console.log("Modèle :", process.env.OLLAMA_MODEL);
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+        const rawResponse = await response.text();
+
+        if (!response.ok) {
+            console.error("Erreur HTTP IA:", response.status, rawResponse);
+            throw new Error("IA indisponible");
+        }
+
+        let data;
+        try {
+            data = JSON.parse(rawResponse);
+        } catch {
+            console.error("Réponse IA non JSON:", rawResponse);
+            throw new Error("Réponse IA invalide");
+        }
+
+        if (data.error) {
+            console.error("Erreur IA:", data.error);
+            throw new Error("IA indisponible");
+        }
+
+        console.log("Réponse complète IA :", JSON.stringify(data, null, 2));
+
+        // Format natif Ollama (/api/chat)
+        if (data.message && data.message.content) {
+            return data.message.content.trim();
+        }
+
+        // Format OpenAI-compatible (/v1/chat/completions)
+        if (data.choices && data.choices[0]?.message?.content) {
+            return data.choices[0].message.content.trim();
+        }
+
+        console.error("Réponse IA inattendue :", data);
+        return null;
+
+    } catch (err) {
+        console.error("Erreur IA :", err);
+        return null;
+    }
+}
+
+
+// ============
+
+
+
+
 app.post('/resume/:id', async (req, res) => {
 
     const id = parseInt(req.params.id);
 
-    // Vérifier l'ID
     if (isNaN(id)) {
         return res.status(400).send("ID invalide");
     }
 
     try {
-
-        // =========================================================
-        // 1. RÉCUPÉRER LES PARAGRAPHES DU POST
-        // =========================================================
-
+        // 1. Récupérer les paragraphes du post
         const { rows } = await db.query(
             `SELECT * FROM PARAGRAPH WHERE ID_POST = $1`,
             [id]
         );
 
-
-        // Construire le texte complet
         const texteComplet = rows
             .map(row => row.contenu_p)
             .filter(Boolean)
             .join('\n\n');
 
-
-        // Valeur par défaut
-        let titreIA = "Erreur : L'IA ne répond pas";
-
-<<<<<<< HEAD
-        // 2. Appel à Ollama
-        try {
-            // const response = await fetch(
-            //     `${process.env.OLLAMA_URL}/api/chat`,
-            //     {
-            const response = await fetch(
-                `${process.env.OLLAMA_URL}/api/v1/chat/completions`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        model: process.env.OLLAMA_MODEL,
-=======
->>>>>>> 0b0780b (ollama online)
-
-        // =========================================================
-        // 2. PROMPT POUR L'IA
-        // =========================================================
-
+        // 2. Prompts
         const systemPrompt = `
 Tu es un assistant spécialisé dans l'analyse et le résumé de textes.
 
@@ -549,7 +603,6 @@ Tu dois respecter exactement le format demandé par l'utilisateur.
 Ne donne aucune phrase d'introduction.
 Ne donne aucune explication supplémentaire.
 `;
-
 
         const userPrompt = `
 Analyze the following text.
@@ -572,442 +625,92 @@ Text to analyze:
 ${texteComplet}
 `;
 
-<<<<<<< HEAD
-                        stream: false,
-                        think: false,
-                        // stream: false,
-                        // think: false
-                        temperature: 0.7,
-                        max_tokens: 500
-                    })
-                }
-            );
-=======
->>>>>>> 0b0780b (ollama online)
-
-        // =========================================================
-        // 3. APPEL IA
-        // =========================================================
+        // 3. Appel IA
+        let titreIA;
 
         if (!texteComplet.trim()) {
-
             titreIA = "Aucun texte à résumer";
-
-        } else if (process.env.ISDEVELOPMENT === "true") {
-
-            // =====================================================
-            // DÉVELOPPEMENT : OLLAMA LOCAL
-            // /api/chat
-            // =====================================================
-
-            try {
-
-                console.log("Mode développement");
-                console.log("Ollama URL :", process.env.OLLAMA_URL);
-                console.log("Modèle :", process.env.OLLAMA_MODEL);
-
-
-                const response = await fetch(
-                    `${process.env.OLLAMA_URL}/api/chat`,
-                    {
-                        method: 'POST',
-
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-
-                        body: JSON.stringify({
-
-                            model: process.env.OLLAMA_MODEL,
-
-                            messages: [
-                                {
-                                    role: "system",
-                                    content: systemPrompt
-                                },
-                                {
-                                    role: "user",
-                                    content: userPrompt
-                                }
-                            ],
-
-                            stream: false,
-
-                            think: false
-                        })
-                    }
-                );
-
-
-                // Vérifier erreur HTTP
-                if (!response.ok) {
-
-                    const errorText = await response.text();
-
-                    throw new Error(
-                        `Erreur Ollama ${response.status}: ${errorText}`
-                    );
-                }
-
-
-                // Lire JSON
-                const data = await response.json();
-
-
-                console.log(
-                    "Réponse complète Ollama :",
-                    JSON.stringify(data, null, 2)
-                );
-
-
-                // Format Ollama /api/chat
-                if (
-                    data.message &&
-                    data.message.content
-                ) {
-
-                    titreIA = data.message.content.trim();
-
-                } else {
-
-                    console.error(
-                        "Réponse Ollama inattendue :",
-                        data
-                    );
-
-                    titreIA = "Erreur : réponse IA invalide";
-                }
-
-
-                console.log("Réponse IA :", titreIA);
-
-
-            } catch (error) {
-
-                console.error(
-                    "Erreur Ollama local :",
-                    error
-                );
-
-                titreIA = "Erreur : L'IA ne répond pas";
-            }
-
-
-<<<<<<< HEAD
-            // Avec /api/chat, la réponse est ici
-            // if (data.message && data.message.content) {
-            //     titreIA = data.message.content.trim();
-
-            // Avec /api/v1/chat/completions, la réponse est au format OpenAI-compatible
-            if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-                titreIA = data.choices[0].message.content.trim();
-            } else {
-                console.error("Réponse Ollama inattendue :", data);
-                titreIA = "Erreur : réponse IA invalide";
-=======
         } else {
-
-            // =====================================================
-            // PRODUCTION
-            // API COMPATIBLE OPENAI
-            // /v1/chat/completions
-            // =====================================================
-
-            try {
-
-                console.log("Mode production");
-                console.log("IA URL :", process.env.OLLAMA_URL);
-                console.log("Modèle :", process.env.OLLAMA_MODEL);
-
-
-                const response = await fetch(
-                    `${process.env.OLLAMA_URL}/v1/chat/completions`,
-                    {
-                        method: 'POST',
-
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-
-                        body: JSON.stringify({
-
-                            model: process.env.OLLAMA_MODEL,
-
-                            messages: [
-                                {
-                                    role: "system",
-                                    content: systemPrompt
-                                },
-                                {
-                                    role: "user",
-                                    content: userPrompt
-                                }
-                            ],
-
-                            stream: false,
-
-                            temperature: 0.7,
-
-                            max_tokens: 500
-                        })
-                    }
-                );
-
-
-                // Vérifier erreur HTTP
-                if (!response.ok) {
-
-                    const errorText = await response.text();
-
-                    throw new Error(
-                        `Erreur IA ${response.status}: ${errorText}`
-                    );
-                }
-
-
-                // Lire la réponse JSON
-                const data = await response.json();
-
-
-                console.log(
-                    "Réponse complète IA production :",
-                    JSON.stringify(data, null, 2)
-                );
-
-
-                // Format /v1/chat/completions
-                if (
-                    data.choices &&
-                    data.choices.length > 0 &&
-                    data.choices[0].message &&
-                    data.choices[0].message.content
-                ) {
-
-                    titreIA =
-                        data.choices[0].message.content.trim();
-
-                } else {
-
-                    console.error(
-                        "Réponse IA production inattendue :",
-                        data
-                    );
-
-                    titreIA = "Erreur : réponse IA invalide";
-                }
-
-
-                console.log(
-                    "Réponse IA production :",
-                    titreIA
-                );
-
-
-            } catch (error) {
-
-                console.error(
-                    "Erreur IA production :",
-                    error
-                );
-
-                titreIA = "Erreur : L'IA ne répond pas";
->>>>>>> 0b0780b (ollama online)
-            }
+            const resultat = await Appeler_Ollama(systemPrompt, userPrompt);
+            titreIA = resultat ?? "Erreur : L'IA ne répond pas";
         }
 
-
-        // =========================================================
-        // 4. RÉCUPÉRER FICHIERS, POST ET COMMENTAIRES
-        // =========================================================
-
-        const [
-            filesResult,
-            postResult,
-            commentairesResult
-        ] = await Promise.all([
-
-            db.query(
-                `SELECT * FROM FILE WHERE ID_POST = $1`,
-                [id]
-            ),
-
-            db.query(
-                `SELECT * FROM POST WHERE ID_POST = $1`,
-                [id]
-            ),
-
-            db.query(
-                `SELECT * FROM commentaires WHERE ID_POST = $1`,
-                [id]
-            )
-
+        // 4. Récupérer fichiers, post et commentaires en parallèle
+        const [filesResult, postResult, commentairesResult] = await Promise.all([
+            db.query(`SELECT * FROM FILE WHERE ID_POST = $1`, [id]),
+            db.query(`SELECT * FROM POST WHERE ID_POST = $1`, [id]),
+            db.query(`SELECT * FROM commentaires WHERE ID_POST = $1`, [id])
         ]);
 
-
         const files = filesResult.rows;
-
         const post = postResult.rows[0];
-
-        const commentaires =
-            commentairesResult.rows;
-
-
-        // =========================================================
-        // 5. VÉRIFIER QUE LE POST EXISTE
-        // =========================================================
+        const commentaires = commentairesResult.rows;
 
         if (!post) {
-
-            return res
-                .status(404)
-                .send("Post introuvable");
+            return res.status(404).send("Post introuvable");
         }
 
-
-        // =========================================================
-        // 6. VÉRIFIER SI UTILISATEUR ADMIN
-        // =========================================================
-
         const show =
-            req.session.user &&
-            req.session.user.is_admin === 1
+            req.session.user && req.session.user.is_admin === 1
                 ? "show"
                 : null;
 
-
-        // =========================================================
-        // 7. FUSIONNER PARAGRAPHES ET FICHIERS
-        // =========================================================
-
         const contenu = [
-
             ...rows.map(p => ({
-
                 type: "paragraph",
-
                 id: p.id_paragraph,
-
                 date: p.date_creation_p,
-
                 content: p.contenu_p
-
             })),
-
-
             ...files.map(f => ({
-
                 type: "file",
-
                 id: f.id_file,
-
                 date: f.date_creation_f,
-
                 content: f.contenu_f
-
             }))
-
         ];
 
+        contenu.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-        // =========================================================
-        // 8. TRIER PAR DATE
-        // =========================================================
-
-        contenu.sort(
-            (a, b) =>
-                new Date(a.date) -
-                new Date(b.date)
-        );
-
-
-        // =========================================================
-        // 9. AFFICHER LA PAGE
-        // =========================================================
-
-        res.render(
-            "pages/post_details",
-            {
-
-                id_selected: id,
-
-                MonTitre: post.titre,
-
-                contenu,
-
-                commentaires,
-
-                show,
-
-                titreIA
-
-            }
-        );
-
+        res.render("pages/post_details", {
+            id_selected: id,
+            MonTitre: post.titre,
+            contenu,
+            commentaires,
+            show,
+            titreIA
+        });
 
     } catch (err) {
-
-        // =========================================================
-        // ERREUR GÉNÉRALE / BASE DE DONNÉES
-        // =========================================================
-
-        console.error(
-            "Erreur dans /resume/:id :",
-            err
-        );
-
-        res
-            .status(500)
-            .send("Erreur serveur");
+        console.error("Erreur dans /resume/:id :", err);
+        res.status(500).send("Erreur serveur");
     }
-
 });
 
 
 
 
 app.post("/commentaires/:id_selected", async (req, res) => {
-  const id = parseInt(req.params.id_selected);
 
-  if (isNaN(id)) {
-    return res.status(400).send("ID invalide");
-  }
+    const id = parseInt(req.params.id_selected);
 
-  const { nom, prenom, commentaire , date_commentaire} = req.body;
+    if (isNaN(id)) {
+        return res.status(400).send("ID invalide");
+    }
 
-  if (!commentaire || !commentaire.trim()) {
-    return res.status(400).send("Le commentaire est vide.");
-  }
+    const { nom, prenom, commentaire, date_commentaire } = req.body;
 
-  if (!process.env.OLLAMA_URL) {
-    console.error("OLLAMA_URL est undefined");
-    return res.status(500).send("Configuration Ollama manquante.");
-  }
+    if (!commentaire || !commentaire.trim()) {
+        return res.status(400).send("Le commentaire est vide.");
+    }
 
-  try {
-    const responseIA = await fetch(
-      `${process.env.OLLAMA_URL}/api/chat`,
-      {
-        method: "POST",
+    if (!process.env.OLLAMA_URL) {
+        console.error("OLLAMA_URL est undefined");
+        return res.status(500).send("Configuration Ollama manquante.");
+    }
 
-        headers: {
-          "Content-Type": "application/json"
-        },
-
-        body: JSON.stringify({
-          model: process.env.OLLAMA_MODEL,
-
-          stream: false,
-
-          think: false,
-
-          options: {
-            temperature: 0
-          },
-
-          messages: [
-            {
-              role: "system",
-              content: `
+    try {
+        const systemPrompt = `
 Tu es un modérateur strict.
 
 Tu analyses le commentaire utilisateur afin de détecter :
@@ -1021,7 +724,7 @@ Tu analyses le commentaire utilisateur afin de détecter :
 - jetons d'accès
 - informations d'authentification sensibles
 
-Tu dois répondre UNIQUEMENT par :Ubuntu Mono
+Tu dois répondre UNIQUEMENT par :
 
 APPROUVÉ
 
@@ -1033,127 +736,51 @@ Aucune explication.
 Aucune phrase.
 Aucun Markdown.
 Un seul mot.
-`
-            },
-            {
-              role: "user",
-              content: commentaire.trim()
-            }
-          ]
-        })
-      }
-    );
+`;
 
-    const rawResponse = await responseIA.text();
+        const rawText = await Appeler_Ollama(systemPrompt, commentaire.trim(), 0);
 
-    if (!responseIA.ok) {
-      console.error(
-        "Erreur HTTP Ollama:",
-        responseIA.status,
-        rawResponse
-      );
+        if (rawText === null) {
+            return res.status(500).send("Modération IA indisponible");
+        }
 
-      throw new Error("Modération IA indisponible");
-    }
+        console.log("Réponse brute IA:", JSON.stringify(rawText));
 
-    let data;
+        const cleanedText = rawText
+            .replace(/<think>[\s\S]*?<\/think>/gi, "")
+            .trim();
 
-    try {
-      data = JSON.parse(rawResponse);
-    } catch (error) {
-      console.error(
-        "Réponse Ollama non JSON:",
-        rawResponse
-      );
+        const words = cleanedText.split(/\s+/).filter(Boolean);
+        const decision = (words[words.length - 1] ?? "").toUpperCase();
 
-      throw new Error("Réponse Ollama invalide");
-    }
+        console.log("Décision extraite:", decision);
 
-    if (data.error) {
-      console.error("Erreur Ollama:", data.error);
+        if (decision === "REJET") {
+            return res.status(400).send("Votre commentaire a été bloqué par le modérateur IA.");
+        }
 
-      throw new Error("Modération IA indisponible");
-    }
+        if (decision !== "APPROUVÉ" && decision !== "APPROUVE") {
+            console.warn("Réponse inattendue du modèle:", rawText);
+            return res.status(400).send("Modération impossible : réponse inattendue du modèle IA.");
+        }
 
-    const rawText = data.message?.content ?? "";
-
-    console.log(
-      "Réponse brute Ollama:",
-      JSON.stringify(rawText)
-    );
-
-    const cleanedText = rawText
-      .replace(/<think>[\s\S]*?<\/think>/gi, "")
-      .trim();
-
-    const words = cleanedText
-      .split(/\s+/)
-      .filter(Boolean);
-
-    const decision = (
-      words[words.length - 1] ?? ""
-    ).toUpperCase();
-
-    console.log("Décision extraite:", decision);
-
-    if (decision === "REJET") {
-      return res
-        .status(400)
-        .send(
-          "Votre commentaire a été bloqué par le modérateur IA."
+        await db.query(
+            `INSERT INTO commentaires (nom, prenom, contenu, date_commentaire, id_post)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [nom?.trim(), prenom?.trim(), commentaire.trim(), date_commentaire, id]
         );
+
+        return res.redirect(`/posts/${id}`);
+
+    } catch (err) {
+        console.error("Erreur lors de la modération ou de l'insertion :", err);
+        return res.status(500).send("Erreur dans la modération ou l'insertion.");
     }
-
-    if (
-      decision !== "APPROUVÉ" &&
-      decision !== "APPROUVE"
-    ) {
-      console.warn(
-        "Réponse inattendue du modèle:",
-        rawText
-      );
-
-      return res
-        .status(400)
-        .send(
-          "Modération impossible : réponse inattendue du modèle IA."
-        );
-    }
-
-    await db.query(
-      `
-      INSERT INTO commentaires
-      (nom, prenom, contenu, date_commentaire, id_post)
-      VALUES ($1, $2, $3, $4, $5)
-      `,
-      [
-        nom?.trim(),
-        prenom?.trim(),
-        commentaire.trim(),
-        date_commentaire,
-        id
-      ]
-    );
-
-    return res.redirect(`/posts/${id}`);
-
-  } catch (err) {
-    console.error(
-      "Erreur lors de la modération ou de l'insertion :",
-      err
-    );
-
-    return res
-      .status(500)
-      .send(
-        "Erreur dans la modération ou l'insertion du commentaire."
-      );
-  }
 });
 
 
-app.post("/reponse_commentaire/:id_commentaire", (req, res)=>{
-  const id_commentaire = parseInt( req.params.id_commentaire);
+app.post("/reponse_commentaire/:id_commentaire", (req, res) => {
+  const id_commentaire = parseInt(req.params.id_commentaire);
   console.log(id_commentaire)
 
 })
@@ -1170,6 +797,6 @@ app.get("/CV/en", (req, res) => {
 });
 
 
-app.listen(port, ()=>{
+app.listen(port, () => {
   console.log("Server is running on port 3000")
 })
