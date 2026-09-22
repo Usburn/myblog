@@ -510,7 +510,7 @@ app.post('/resume/:id', async (req, res) => {
         // 2. Appel à Ollama
         try {
             const response = await fetch(
-                `${process.env.OLLAMA_URL}/api/chat`,
+                `${process.env.OLLAMA_URL}/api/v1/chat/completions`,
                 {
                     method: 'POST',
                     headers: {
@@ -555,9 +555,10 @@ ${texteComplet}
 `
                             }
                         ],
-
                         stream: false,
-                        think: false
+                        think: false,
+                        temperature: 0.7,
+                        max_tokens: 500
                     })
                 }
             );
@@ -573,9 +574,9 @@ ${texteComplet}
 
             const data = await response.json();
 
-            // Avec /api/chat, la réponse est ici
-            if (data.message && data.message.content) {
-                titreIA = data.message.content.trim();
+            // Avec /api/v1/chat/completions, la réponse est ici (format OpenAI-compatible)
+            if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+                titreIA = data.choices[0].message.content.trim();
             } else {
                 console.error("Réponse Ollama inattendue :", data);
                 titreIA = "Erreur : réponse IA invalide";
