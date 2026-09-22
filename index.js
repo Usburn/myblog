@@ -20,6 +20,7 @@ app.use(express.static("public"));
 app.set("views", path.join(__dirname, "views"));
 app.use(express.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
+app.set("trust proxy", true); // add this once, near your app setup
 
 app.use(
   session({
@@ -131,54 +132,44 @@ function verifAuthAdmin(req, res, next) {
 }
 console.log("FICHIER SERVEUR CHARGÉ");
 
+
 app.get("/", async (req, res) => {
-
-  console.log("ip :", req.ip);
-  const ip = req.ip;
-
+  const currentIp = req.ip;
   let dataMeteo = null;
-
+  console.log("Current IP:", currentIp);
+  // 70.82.41.209
   try {
-
     const response = await fetch(
-      `https://api.ipwho.org/ip/70.82.41.209?apiKey=${process.env.API_KEY_IP}`
+      `https://api.ipwho.org/ip/${currentIp}?apiKey=${process.env.API_KEY_IP}`
     );
-
     const dataIP = await response.json();
 
-    const ville = dataIP.data.geoLocation.city;
-    const lat = dataIP.data.geoLocation.latitude;
-    const lon = dataIP.data.geoLocation.longitude;
-
-    console.log(ville);
-
-    try {
-
-      const meteo = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,relative_humidity_2m`
-      );
-
-      const result_meteo = await meteo.json();
-
-      dataMeteo = {
-        ville: ville,
-        temperature: result_meteo.current.temperature_2m,
-        humidity: result_meteo.current.relative_humidity_2m,
-        wind: result_meteo.current.wind_speed_10m
-      };
-
-    } catch (err) {
-      console.log("Erreur météo :", err);
+    if (!dataIP?.data?.geoLocation) {
+      throw new Error("Invalid IP geolocation response");
     }
 
+    const { city: ville, latitude: lat, longitude: lon } = dataIP.data.geoLocation;
+
+    const meteo = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,relative_humidity_2m`
+    );
+    const result_meteo = await meteo.json();
+
+    if (!result_meteo?.current) {
+      throw new Error("Invalid weather response");
+    }
+
+    dataMeteo = {
+      ville,
+      temperature: result_meteo.current.temperature_2m,
+      humidity: result_meteo.current.relative_humidity_2m,
+      wind: result_meteo.current.wind_speed_10m,
+    };
   } catch (err) {
-    console.log("Erreur IP :", err);
+    console.log("Erreur météo/IP :", err.message);
   }
 
-  res.render("pages/accueil.ejs", {
-    data: dataMeteo
-  });
-
+  res.render("pages/accueil.ejs", { data: dataMeteo });
 });
 
 
